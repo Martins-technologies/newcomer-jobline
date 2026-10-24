@@ -28,7 +28,7 @@ function redirectAfterAuth(navigate, userRole, returnTo) {
 }
 
 export default function SignUpPage() {
-  const { login, signIn, signUp } = useAuth();
+  const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const returnTo = location.state?.from;
@@ -39,6 +39,9 @@ export default function SignUpPage() {
 
   const [role, setRole] = useState(initialUiRole);
   const [fullName, setFullName] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [companyWebsite, setCompanyWebsite] = useState("");
+  const [companyRegistrationNumber, setCompanyRegistrationNumber] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -56,54 +59,48 @@ export default function SignUpPage() {
       return;
     }
 
-    if (password.length < 6) {
-      setErrorMsg("Password must be at least 6 characters.");
+    if (password.length < 8) {
+      setErrorMsg("Password must be at least 8 characters.");
       return;
     }
 
     setLoading(true);
     const targetRole = roleFromUi(role);
 
-    async function finishWithRole(userRole) {
-      setLoading(false);
-      redirectAfterAuth(navigate, userRole, returnTo);
-    }
+    try {
+      const data = await signUp({
+        name: fullName.trim(),
+        email: email.trim(),
+        password,
+        role: targetRole,
+        ...(targetRole === "recruiter"
+          ? {
+              company_name: companyName.trim(),
+              company_website: companyWebsite.trim(),
+              company_registration_number: companyRegistrationNumber.trim(),
+            }
+          : {}),
+      });
 
-    if (fullName.trim() && email.trim() && password) {
-      try {
-        const data = await signUp(fullName.trim(), email.trim(), password, targetRole);
-        const userRole = data?.user?.role || targetRole;
-        if (data?.session) {
-          await finishWithRole(userRole);
-          return;
-        }
-        try {
-          const user = await signIn(email.trim(), password);
-          await finishWithRole(user?.role || targetRole);
-          return;
-        } catch (signInErr) {
-          console.warn("Registered but auto sign-in failed, using role session:", signInErr);
-          login(targetRole);
-          await finishWithRole(targetRole);
-          return;
-        }
-      } catch (err) {
-        console.warn("Backend sign-up failed, using mock role fallback:", err);
-        if (
-          err.message.includes("email") ||
-          err.message.includes("password") ||
-          err.message.includes("already") ||
-          err.message.includes("exists")
-        ) {
-          setErrorMsg(err.message);
-          setLoading(false);
-          return;
-        }
+      const userRole = data?.user?.role || targetRole;
+      if (data?.session?.access_token) {
+        setLoading(false);
+        redirectAfterAuth(navigate, userRole, returnTo);
+        return;
       }
-    }
 
-    login(targetRole);
-    await finishWithRole(targetRole);
+      try {
+        const user = await signIn(email.trim(), password);
+        setLoading(false);
+        redirectAfterAuth(navigate, user?.role || userRole, returnTo);
+      } catch {
+        setErrorMsg("Your account was created. Verify your email if requested, then sign in.");
+        setLoading(false);
+      }
+    } catch (err) {
+      setErrorMsg(err.message || "Your account could not be created. Please try again.");
+      setLoading(false);
+    }
   }
 
   return (
@@ -190,6 +187,54 @@ export default function SignUpPage() {
                 />
               </div>
             </div>
+
+            {role === "employer" && (
+              <>
+                <div>
+                  <label className="block text-xs font-semibold text-[#4f739f] mb-1.5">
+                    Company name <span className="text-[#F5A623]">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="companyName"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    required
+                    autoComplete="organization"
+                    className="w-full bg-white border border-[#d5dfeb] rounded-xl py-3 px-4 text-sm text-[#0B2545] focus:outline-none focus:border-[#F5A623] focus:ring-1 focus:ring-[#F5A623] transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#4f739f] mb-1.5">
+                    Company website <span className="text-[#F5A623]">*</span>
+                  </label>
+                  <input
+                    type="url"
+                    name="companyWebsite"
+                    value={companyWebsite}
+                    onChange={(e) => setCompanyWebsite(e.target.value)}
+                    required
+                    placeholder="https://example.ca"
+                    autoComplete="url"
+                    className="w-full bg-white border border-[#d5dfeb] rounded-xl py-3 px-4 text-sm text-[#0B2545] placeholder-[#7f9abd] focus:outline-none focus:border-[#F5A623] focus:ring-1 focus:ring-[#F5A623] transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#4f739f] mb-1.5">
+                    Business registration number <span className="text-[#F5A623]">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="companyRegistrationNumber"
+                    value={companyRegistrationNumber}
+                    onChange={(e) => setCompanyRegistrationNumber(e.target.value)}
+                    required
+                    autoComplete="off"
+                    className="w-full bg-white border border-[#d5dfeb] rounded-xl py-3 px-4 text-sm text-[#0B2545] focus:outline-none focus:border-[#F5A623] focus:ring-1 focus:ring-[#F5A623] transition-colors"
+                  />
+                </div>
+              </>
+            )}
 
             <div>
               <label className="block text-xs font-semibold text-[#4f739f] mb-1.5">
