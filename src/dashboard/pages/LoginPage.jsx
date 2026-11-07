@@ -172,6 +172,12 @@ export default function LoginPage() {
               </div>
             </div>
 
+            <div className="text-right text-sm">
+              <a className="font-semibold text-[#0B2545] underline hover:text-[#4f739f]" href="https://www.jooblie.com/forgot-password">
+                Forgot password?
+              </a>
+            </div>
+
             {/* Submit */}
             <button
               type="submit"
